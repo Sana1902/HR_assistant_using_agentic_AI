@@ -19,3 +19,15 @@ export interface EmployeeListResponse {
   };
 }
 
+export interface CreateEmployeePayload {
+  name: string;
+  department: string;
+  position: string;
+  email?: string;
+  phone?: string;
+  dateOfJoining?: string;
+  employmentType?: string;
+  manager?: string;
+  employeeId?: string;
+}
+

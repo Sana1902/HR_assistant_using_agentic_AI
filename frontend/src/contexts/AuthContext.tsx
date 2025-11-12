@@ -1,15 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role?: string;
-  avatar?: string;
-}
+import { authService } from '@/services/api';
+import type { AuthUser } from '@/types/api';
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
@@ -19,64 +13,89 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Check for existing session on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        setIsAuthenticated(true);
-      } catch (e) {
+    let isActive = true;
+
+    const initializeSession = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
         localStorage.removeItem('user');
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
       }
-    }
+
+      try {
+        const response = await authService.me();
+        if (!isActive) return;
+
+        const userData = response?.data?.user;
+        if (userData) {
+          setUser(userData);
+          setIsAuthenticated(true);
+          localStorage.setItem('user', JSON.stringify(userData));
+        }
+      } catch (error) {
+        if (!isActive) return;
+        localStorage.removeItem('user');
+        localStorage.removeItem('access_token');
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    };
+
+    void initializeSession();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
-  const login = async (email: string, _password: string) => {
-    // Simulate API call - replace with actual API call
-    return new Promise<void>((resolve, _reject) => {
-      setTimeout(() => {
-        // For demo purposes, accept any email/password
-        const userData: User = {
-          id: '1',
-          name: email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          email: email,
-          role: 'HR Manager',
-        };
-        setUser(userData);
-        setIsAuthenticated(true);
-        localStorage.setItem('user', JSON.stringify(userData));
-        resolve();
-      }, 500);
-    });
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await authService.login(email, password);
+      const { access_token, user: userData } = response.data;
+
+      setUser(userData);
+      setIsAuthenticated(true);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('access_token', access_token);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Unable to sign in. Please check your credentials and try again.';
+      throw new Error(message);
+    }
   };
 
-  const register = async (name: string, email: string, _password: string) => {
-    // Simulate API call - replace with actual API call
-    return new Promise<void>((resolve, _reject) => {
-      setTimeout(() => {
-        const userData: User = {
-          id: Date.now().toString(),
-          name: name,
-          email: email,
-          role: 'HR Manager',
-        };
-        setUser(userData);
-        setIsAuthenticated(true);
-        localStorage.setItem('user', JSON.stringify(userData));
-        resolve();
-      }, 500);
-    });
+  const register = async (name: string, email: string, password: string) => {
+    try {
+      const response = await authService.register(name, email, password);
+      const { access_token, user: userData } = response.data;
+
+      setUser(userData);
+      setIsAuthenticated(true);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('access_token', access_token);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Unable to create account. Please try again.';
+      throw new Error(message);
+    }
   };
 
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem('user');
+    localStorage.removeItem('access_token');
   };
 
   return (

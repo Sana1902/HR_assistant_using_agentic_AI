@@ -13,4 +13,5 @@ python-dotenv==1.0.0
 pydantic>=2.5.3,<2.13
 pydantic-settings==2.1.0
 email-validator==2.1.0
+statsmodels>=0.14.0
 

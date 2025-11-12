@@ -1,4 +1,11 @@
 import axios from 'axios';
+import type { CreateEmployeePayload } from '@/types/employee';
+import type {
+  DocumentGenerationPayload,
+  GeneratedDocumentResponse,
+  GeneratedDocument,
+  AuthResponse,
+} from '@/types/api';
 
 const API_BASE_URL = (import.meta.env as { VITE_API_URL?: string }).VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -55,6 +62,55 @@ export const employeeService = {
     const response = await api.get(`/employees/${id}/attrition-risk`);
     return response.data;
   },
+  getPerformancePrediction: async (id: string, periods?: number) => {
+    const params = periods ? { periods } : {};
+    const response = await api.get(`/employees/${id}/performance-prediction`, { params });
+    return response.data;
+  },
+  create: async (payload: CreateEmployeePayload) => {
+    const response = await api.post('/employees', payload);
+    return response.data;
+  },
+};
+
+// Documents service
+export const documentsService = {
+  generateOfferLetter: async (payload: DocumentGenerationPayload<'offer_letter'>) => {
+    const response = await api.post('/agents/documents/offer-letter', payload);
+    return response.data as GeneratedDocumentResponse;
+  },
+  generateContract: async (payload: DocumentGenerationPayload<'employment_contract'>) => {
+    const response = await api.post('/agents/documents/contract', payload);
+    return response.data as GeneratedDocumentResponse;
+  },
+  generateExperienceCertificate: async (payload: DocumentGenerationPayload<'experience_certificate'>) => {
+    const response = await api.post('/agents/documents/experience-certificate', payload);
+    return response.data as GeneratedDocumentResponse;
+  },
+  generateSalaryCertificate: async (payload: DocumentGenerationPayload<'salary_certificate'>) => {
+    const response = await api.post('/agents/documents/salary-certificate', payload);
+    return response.data as GeneratedDocumentResponse;
+  },
+  listDocuments: async (params?: { type?: string; employee_id?: string }) => {
+    const response = await api.get('/agents/documents', { params });
+    return response.data as { success: boolean; data: GeneratedDocument[] };
+  },
+};
+
+// Auth service
+export const authService = {
+  login: async (email: string, password: string) => {
+    const response = await api.post('/auth/login', { email, password });
+    return response.data as AuthResponse;
+  },
+  register: async (name: string, email: string, password: string) => {
+    const response = await api.post('/auth/register', { name, email, password });
+    return response.data as AuthResponse;
+  },
+  me: async () => {
+    const response = await api.get('/auth/me');
+    return response.data as AuthResponse;
+  },
 };
 
 // Analytics service
@@ -69,6 +125,11 @@ export const analyticsService = {
   },
   getAttritionRisk: async () => {
     const response = await api.get('/analytics/attrition-risk');
+    return response.data;
+  },
+  getPerformanceTrend: async (periods?: number) => {
+    const params = periods ? { periods } : {};
+    const response = await api.get('/analytics/performance-trend', { params });
     return response.data;
   },
 };

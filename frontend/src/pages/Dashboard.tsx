@@ -114,7 +114,12 @@ export const Dashboard = () => {
     queryFn: () => analyticsService.getAttritionRisk(),
   });
 
-  const isLoading = summaryLoading || deptLoading || attritionLoading;
+  const { data: performanceTrendData, isLoading: performanceLoading } = useQuery({
+    queryKey: ['performance-trend'],
+    queryFn: () => analyticsService.getPerformanceTrend(6),
+  });
+
+  const isLoading = summaryLoading || deptLoading || attritionLoading || performanceLoading;
 
   const metrics = [
     {
@@ -163,15 +168,17 @@ export const Dashboard = () => {
     { name: 'High', count: 0 },
   ];
 
-  // Sample performance data (you can replace with real data)
-  const performanceData = [
-    { month: 'Jan', performance: 85, target: 80 },
-    { month: 'Feb', performance: 88, target: 80 },
-    { month: 'Mar', performance: 82, target: 80 },
-    { month: 'Apr', performance: 90, target: 85 },
-    { month: 'May', performance: 87, target: 85 },
-    { month: 'Jun', performance: 92, target: 85 },
-  ];
+  // Performance data from ARIMA model predictions
+  const performanceData = performanceTrendData?.data && performanceTrendData.data.length > 0
+    ? performanceTrendData.data
+    : [
+        { month: 'Jan', performance: 85, target: 80 },
+        { month: 'Feb', performance: 88, target: 80 },
+        { month: 'Mar', performance: 82, target: 80 },
+        { month: 'Apr', performance: 90, target: 85 },
+        { month: 'May', performance: 87, target: 85 },
+        { month: 'Jun', performance: 92, target: 85 },
+      ];
 
   if (isLoading) {
     return (

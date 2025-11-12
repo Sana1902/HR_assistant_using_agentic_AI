@@ -2,6 +2,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
+from datetime import datetime
+from bson import ObjectId
 from app.services.document_generation_agent import DocumentGenerationAgent
 from app.core.database import get_database
 
@@ -20,7 +22,7 @@ class GenerateCertificateRequest(BaseModel):
     employee_data: Dict[str, Any]
     certificate_data: Dict[str, Any]
 
-@router.post("/agents/documents/offer-letter")
+@router.post("/documents/offer-letter")
 async def generate_offer_letter(request: GenerateOfferLetterRequest):
     """Generate offer letter"""
     try:
@@ -34,7 +36,7 @@ async def generate_offer_letter(request: GenerateOfferLetterRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/agents/documents/contract")
+@router.post("/documents/contract")
 async def generate_contract(request: GenerateContractRequest):
     """Generate employment contract"""
     try:
@@ -47,7 +49,7 @@ async def generate_contract(request: GenerateContractRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/agents/documents/experience-certificate")
+@router.post("/documents/experience-certificate")
 async def generate_experience_certificate(request: GenerateCertificateRequest):
     """Generate experience certificate"""
     try:
@@ -60,7 +62,7 @@ async def generate_experience_certificate(request: GenerateCertificateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/agents/documents/salary-certificate")
+@router.post("/documents/salary-certificate")
 async def generate_salary_certificate(request: GenerateCertificateRequest):
     """Generate salary certificate"""
     try:
@@ -73,7 +75,7 @@ async def generate_salary_certificate(request: GenerateCertificateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/agents/documents")
+@router.get("/documents")
 async def get_documents(document_type: Optional[str] = None, employee_id: Optional[str] = None):
     """Get generated documents"""
     db = get_database()
@@ -92,18 +94,28 @@ async def get_documents(document_type: Optional[str] = None, employee_id: Option
     
     return {"success": True, "data": documents}
 
-@router.post("/agents/documents/{document_id}/send")
+@router.post("/documents/{document_id}/send")
 async def send_document(document_id: str, recipient_email: str):
     """Send generated document via email"""
     try:
         db = get_database()
-        document = await db["Generated_Documents"].find_one({"_id": document_id})
+        try:
+            object_id = ObjectId(document_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid document ID")
+
+        document = await db["Generated_Documents"].find_one({"_id": object_id})
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
         
         agent = DocumentGenerationAgent()
         await agent.send_document_email(document, recipient_email)
         
+        await db["Generated_Documents"].update_one(
+            {"_id": object_id},
+            {"$set": {"status": "sent", "sent_at": datetime.now().isoformat(), "sent_to": recipient_email}}
+        )
+
         return {"success": True, "message": "Document sent successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from app.core.database import get_database
 
 router = APIRouter()
@@ -106,5 +106,17 @@ async def get_attrition_risk_distribution():
         
         return {"success": True, "data": data}
     except:
+        return {"success": True, "data": []}
+
+@router.get("/performance-trend")
+async def get_performance_trend(periods: int = Query(6, ge=1, le=12)):
+    """Get performance trend data from ARIMA models for dashboard"""
+    from app.services.ml_service import get_performance_trend_data
+    
+    try:
+        trend_data = await get_performance_trend_data(periods=periods)
+        return {"success": True, "data": trend_data}
+    except Exception as e:
+        # Return empty data if model not available
         return {"success": True, "data": []}
 

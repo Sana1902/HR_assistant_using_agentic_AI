@@ -22,6 +22,12 @@ export const Login = () => {
     setLoading(true);
 
     try {
+      if (!isLogin && password.length < 8) {
+        setError('Password must be at least 8 characters long');
+        setLoading(false);
+        return;
+      }
+
       if (isLogin) {
         await login(email, password);
       } else {
@@ -60,7 +66,10 @@ export const Login = () => {
           {/* Tabs */}
           <div className="flex gap-2 mb-6 bg-slate-700/50 p-1 rounded-lg">
             <button
-              onClick={() => setIsLogin(true)}
+              onClick={() => {
+                setIsLogin(true);
+                setError('');
+              }}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
                 isLogin
                   ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-lg shadow-purple-500/50'
@@ -70,7 +79,10 @@ export const Login = () => {
               Login
             </button>
             <button
-              onClick={() => setIsLogin(false)}
+              onClick={() => {
+                setIsLogin(false);
+                setError('');
+              }}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
                 !isLogin
                   ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-lg shadow-purple-500/50'
@@ -154,7 +166,10 @@ export const Login = () => {
           <p className="mt-6 text-center text-sm text-slate-400">
             {isLogin ? "Don't have an account? " : 'Already have an account? '}
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError('');
+              }}
               className="text-purple-400 hover:text-purple-300 font-medium"
             >
               {isLogin ? 'Register' : 'Login'}
