@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Search, User, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { Bell, Search, User, Settings, LogOut, ChevronDown, Menu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 
-export const Navbar = () => {
+type NavbarProps = {
+  onMenuClick?: () => void;
+};
+
+export const Navbar = ({ onMenuClick }: NavbarProps) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuth();
@@ -12,7 +16,10 @@ export const Navbar = () => {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target as Node)
+      ) {
         setIsProfileOpen(false);
       }
     };
@@ -38,7 +45,14 @@ export const Navbar = () => {
 
   return (
     <div className="h-16 bg-slate-800 border-b border-slate-700 px-6 flex items-center justify-between">
-      <div className="flex-1 max-w-md">
+      <div className="flex items-center gap-4 flex-1 max-w-md">
+        <button
+          onClick={onMenuClick}
+          className="flex items-center justify-center h-10 w-10 rounded-lg border border-slate-600 bg-slate-700/60 text-slate-200 hover:border-purple-500/60 hover:bg-slate-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input

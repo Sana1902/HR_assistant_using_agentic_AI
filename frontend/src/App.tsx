@@ -10,6 +10,7 @@ import { HireEmployee } from './pages/HireEmployee';
 import { AgentDashboard } from './pages/AgentDashboard';
 import { Analytics } from './pages/Analytics';
 import { Policies } from './pages/Policies';
+import { Settings } from './pages/Settings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +52,7 @@ function App() {
               <Route path="hire" element={<HireEmployee />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="policies" element={<Policies />} />
+              <Route path="settings" element={<Settings />} />
               <Route path="profile" element={<Profile />} />
             </Route>
             

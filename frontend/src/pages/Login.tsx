@@ -53,8 +53,8 @@ export const Login = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-600 rounded-2xl mb-4">
               <Bot className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">TalentFlow</h1>
-            <p className="text-slate-400">HR Management System</p>
+            <h1 className="text-3xl font-bold text-white mb-2">Next-Gen HR</h1>
+            <p className="text-slate-400">TalentFlow Platform</p>
           </div>
 
           {/* Tabs */}
