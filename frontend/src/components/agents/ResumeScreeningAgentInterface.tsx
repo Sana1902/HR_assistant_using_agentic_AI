@@ -63,9 +63,9 @@ export const ResumeScreeningAgentInterface = () => {
             <FileText className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Resume Screening Agent
-            </h2>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent transition-colors duration-300 group-hover:text-white">
+        Resume Screening Agent
+          </h2>
             <p className="text-slate-600 mt-1">Automatically screen resumes and match to job requirements</p>
           </div>
         </div>
