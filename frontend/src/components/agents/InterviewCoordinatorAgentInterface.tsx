@@ -214,7 +214,7 @@ export const InterviewCoordinatorAgentInterface = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all group ${
                     activeStep === step.id
                       ? 'border-orange-500 bg-orange-50'
                       : 'border-slate-200 hover:border-orange-300 hover:bg-slate-50'
@@ -227,13 +227,13 @@ export const InterviewCoordinatorAgentInterface = () => {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm text-white hover:text-black transition-colors">{step.name}</h4>
-                        <Badge variant="secondary" className="text-xs">
+                        <h4 className="font-semibold text-sm text-white group-hover:text-black transition-colors">{step.name}</h4>
+                        <Badge variant="secondary" className="text-xs group-hover:text-black">
                           {index + 1}
                         </Badge>
                       </div>
-                      <p className="text-xs text-white hover:text-black transition-colors">{step.description}</p>
-                      <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-black mt-2">
+                      <p className="text-xs text-white group-hover:text-black transition-colors">{step.description}</p>
+                      <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-black group-hover:text-black mt-2">
                         {step.api}
                       </div>
                     </div>

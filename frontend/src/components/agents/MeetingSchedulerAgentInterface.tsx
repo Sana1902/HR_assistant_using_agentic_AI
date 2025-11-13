@@ -95,10 +95,10 @@ export const MeetingSchedulerAgentInterface = () => {
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <h4 className="font-semibold text-white group-hover:text-black transition-colors">{step.name}</h4>
-                    <Badge variant="secondary">Step {index + 1}</Badge>
+                    <Badge variant="secondary" className="group-hover:text-black">Step {index + 1}</Badge>
                   </div>
                   <p className="text-sm text-white group-hover:text-black transition-colors mb-2">{step.description}</p>
-                  <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-black">
+                  <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-black group-hover:text-black">
                     {step.api}
                   </div>
                 </motion.div>
