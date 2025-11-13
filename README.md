@@ -1,4 +1,4 @@
-# 🎯 TalentFlow - Complete HR Management Platform
+# 🎯 Next Gen HR - Complete HR Management Platform using agentic AI
 
 A comprehensive, production-ready HR management platform with AI/ML capabilities, built with React + TypeScript frontend and FastAPI backend.
 

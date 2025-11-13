@@ -362,7 +362,7 @@ export const DocumentGenerationAgentInterface = () => {
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
       rows={4}
-      className="w-full rounded-md border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
     />
   );
 

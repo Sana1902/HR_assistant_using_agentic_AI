@@ -227,13 +227,13 @@ export const InterviewCoordinatorAgentInterface = () => {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm">{step.name}</h4>
+                        <h4 className="font-semibold text-sm text-white hover:text-black transition-colors">{step.name}</h4>
                         <Badge variant="secondary" className="text-xs">
                           {index + 1}
                         </Badge>
                       </div>
-                      <p className="text-xs text-slate-600">{step.description}</p>
-                      <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-slate-700 mt-2">
+                      <p className="text-xs text-white hover:text-black transition-colors">{step.description}</p>
+                      <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-black mt-2">
                         {step.api}
                       </div>
                     </div>
@@ -476,7 +476,7 @@ export const InterviewCoordinatorAgentInterface = () => {
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                   placeholder="Enter interview feedback..."
-                  className="w-full min-h-[150px] p-3 border border-slate-300 rounded-lg resize-none"
+                  className="w-full min-h-[150px] p-3 border border-slate-300 rounded-lg resize-none text-black"
                 />
               </div>
               <Button

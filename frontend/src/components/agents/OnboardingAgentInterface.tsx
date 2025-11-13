@@ -251,12 +251,12 @@ export const OnboardingAgentInterface = () => {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm">{step.name}</h4>
+                        <h4 className="font-semibold text-sm text-white hover:text-black transition-colors">{step.name}</h4>
                         <Badge variant="secondary" className="text-xs">
                           {index + 1}
                         </Badge>
                       </div>
-                      <p className="text-xs text-slate-600">{step.description}</p>
+                      <p className="text-xs text-white hover:text-black transition-colors">{step.description}</p>
                     </div>
                   </div>
                 </motion.div>
