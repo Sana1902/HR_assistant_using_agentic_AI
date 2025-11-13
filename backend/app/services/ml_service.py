@@ -113,6 +113,358 @@ def load_models():
 # Load models on import
 load_models()
 
+SCORE_KEYS = ["score", "Score", "rating", "Rating", "performance_score", "PerformanceScore", "PerformanceRating", "value", "Value"]
+DATE_KEYS = [
+    "Review_Date",
+    "review_date",
+    "ReviewDate",
+    "Date",
+    "date",
+    "Period",
+    "period",
+    "Month",
+    "month",
+    "timestamp",
+    "Timestamp",
+]
+EMPLOYEE_ID_KEYS = ["Employee_ID", "EmployeeID", "employee_id", "employeeId", "EmployeeId", "id"]
+MODEL_VERSION = "linear_regression_v1"
+PREDICTION_COLLECTION = "Performance_predictions"
+
+
+def _collect_employee_identifiers(employee: Optional[Dict[str, Any]], fallback_id: str) -> Set[str]:
+    identifiers: Set[str] = set()
+    if fallback_id:
+        identifiers.add(str(fallback_id).strip())
+    if not employee:
+        return {identifier for identifier in identifiers if identifier}
+    for key in EMPLOYEE_ID_KEYS + ["_id"]:
+        value = employee.get(key)
+        if value is None:
+            continue
+        if key == "_id":
+            value = str(value)
+        text = str(value).strip()
+        if text:
+            identifiers.add(text)
+    return {identifier for identifier in identifiers if identifier}
+
+
+def _ensure_datetime(value: Any) -> Optional[datetime]:
+    if not value and value != 0:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(value)
+        except Exception:
+            return None
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            dt = pd.to_datetime(text, errors="coerce")
+            if pd.isna(dt):
+                return None
+            if hasattr(dt, "to_pydatetime"):
+                return dt.to_pydatetime()
+            if isinstance(dt, datetime):
+                return dt
+        except Exception:
+            return None
+    return None
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    if isinstance(value, (int, float, np.number)):
+        return float(value)
+    try:
+        return float(str(value).strip())
+    except (ValueError, TypeError):
+        return None
+
+
+def _extract_score(source: Dict[str, Any]) -> Optional[float]:
+    for key in SCORE_KEYS:
+        if key in source:
+            score = _coerce_float(source[key])
+            if score is not None:
+                return score
+    return None
+
+
+def _extract_date(source: Dict[str, Any]) -> Optional[datetime]:
+    for key in DATE_KEYS:
+        if key in source:
+            dt = _ensure_datetime(source[key])
+            if dt:
+                return dt
+    # Fallback when year/month fields exist
+    year = source.get("Year") or source.get("year") or source.get("Review_Year")
+    month = source.get("Month") or source.get("month") or source.get("Review_Month")
+    if isinstance(year, (int, float)) and isinstance(month, (int, float)):
+        try:
+            return datetime(int(year), int(month), 1)
+        except Exception:
+            return None
+    return None
+
+
+def _prepare_performance_history(
+    employee: Optional[Dict[str, Any]],
+    performance_docs: Iterable[Dict[str, Any]],
+) -> List[Tuple[datetime, float]]:
+    data_points: List[Tuple[Optional[datetime], float]] = []
+
+    for doc in performance_docs:
+        score = _extract_score(doc)
+        if score is None:
+            continue
+        dt = _extract_date(doc)
+        data_points.append((dt, score))
+
+    history_entries = None
+    if employee:
+        history_entries = (
+            employee.get("PerformanceHistory")
+            or employee.get("performance_history")
+            or employee.get("performanceHistory")
+        )
+        if isinstance(history_entries, list):
+            for entry in history_entries:
+                if isinstance(entry, dict):
+                    score = _extract_score(entry)
+                    if score is None:
+                        continue
+                    dt = _extract_date(entry)
+                    if dt is None and "period" in entry and isinstance(entry["period"], str):
+                        dt = _ensure_datetime(entry["period"])
+                    data_points.append((dt, score))
+        current_rating = _coerce_float(employee.get("PerformanceRating") or employee.get("performance_rating"))
+        if current_rating is not None:
+            dt = _ensure_datetime(
+                employee.get("LastPerformanceReviewDate")
+                or employee.get("last_review_date")
+                or employee.get("LastReviewDate")
+            )
+            data_points.append((dt, current_rating))
+
+    if not data_points:
+        return []
+
+    # If all dates missing, create synthetic monthly timeline
+    if all(point[0] is None for point in data_points):
+        base_date = datetime.utcnow() - timedelta(days=30 * (len(data_points) - 1))
+        with_dates = []
+        for idx, (_, score) in enumerate(data_points):
+            with_dates.append((base_date + timedelta(days=30 * idx), score))
+        data_points = with_dates
+    else:
+        filled_points: List[Tuple[datetime, float]] = []
+        last_known = None
+        for dt, score in sorted(data_points, key=lambda item: item[0] or datetime.min):
+            if dt is None:
+                if last_known is None:
+                    last_known = datetime.utcnow()
+                else:
+                    last_known = last_known + timedelta(days=30)
+                filled_points.append((last_known, score))
+            else:
+                last_known = dt
+                filled_points.append((dt, score))
+        data_points = filled_points
+
+    # Deduplicate by date (keep latest value)
+    dedup: Dict[datetime, float] = {}
+    for dt, score in data_points:
+        dedup[dt] = score
+
+    sorted_points = sorted(dedup.items(), key=lambda item: item[0])
+    return [(dt, float(score)) for dt, score in sorted_points]
+
+
+def _is_prediction_record_stale(record: Dict[str, Any], max_age_hours: int = 24) -> bool:
+    generated_at = record.get("generated_at")
+    if isinstance(generated_at, dict) and "$date" in generated_at:
+        generated_at = _ensure_datetime(generated_at["$date"])
+    if isinstance(generated_at, str):
+        generated_at = _ensure_datetime(generated_at)
+    if not isinstance(generated_at, datetime):
+        return True
+    return generated_at < datetime.utcnow() - timedelta(hours=max_age_hours)
+
+
+def _determine_trend(predictions: List[float]) -> str:
+    if len(predictions) < 2:
+        return "stable"
+    first, last = predictions[0], predictions[-1]
+    if last > first + 0.5:
+        return "increasing"
+    if last < first - 0.5:
+        return "decreasing"
+    return "stable"
+
+
+async def _generate_performance_prediction_record(
+    employee: Dict[str, Any],
+    possible_ids: Set[str],
+    periods: int = 6,
+) -> Optional[Dict[str, Any]]:
+    db = get_database()
+
+    query_or = []
+    for key in EMPLOYEE_ID_KEYS:
+        query_or.append({key: {"$in": list(possible_ids)}})
+    performance_docs: List[Dict[str, Any]] = []
+    if query_or:
+        performance_docs = await db["Performance"].find({"$or": query_or}).sort("Review_Date", 1).to_list(length=None)
+
+    history_points = _prepare_performance_history(employee, performance_docs)
+    if len(history_points) == 0:
+        return None
+
+    history_dates = [point[0] for point in history_points]
+    history_scores = np.array([point[1] for point in history_points], dtype=float)
+
+    # Ensure at least constant model when insufficient data
+    model = None
+    metrics: Dict[str, float] = {}
+    predictions = np.array([])
+
+    if len(history_scores) >= 2:
+        indices = np.arange(len(history_scores)).reshape(-1, 1)
+        try:
+            if len(history_scores) >= 3:
+                split_index = max(1, len(history_scores) - max(1, int(round(len(history_scores) * 0.2))))
+                if split_index >= len(history_scores):
+                    split_index = len(history_scores) - 1
+                X_train, y_train = indices[:split_index], history_scores[:split_index]
+                X_test, y_test = indices[split_index:], history_scores[split_index:]
+            else:
+                X_train, y_train = indices, history_scores
+                X_test, y_test = indices, history_scores
+
+            model = LinearRegression()
+            model.fit(X_train, y_train)
+            y_test_pred = model.predict(X_test)
+            if len(y_test) > 0:
+                metrics["mae"] = float(mean_absolute_error(y_test, y_test_pred))
+                metrics["rmse"] = float(np.sqrt(mean_squared_error(y_test, y_test_pred)))
+
+            future_idx = np.arange(len(history_scores), len(history_scores) + periods).reshape(-1, 1)
+            predictions = model.predict(future_idx)
+        except Exception as exc:
+            logger.warning(f"Performance prediction model training failed for employee {possible_ids}: {exc}")
+            model = None
+
+    if model is None or predictions.size == 0:
+        baseline = history_scores[-1]
+        predictions = np.repeat(baseline, periods)
+
+    predictions = np.clip(predictions, 0, 100)
+
+    # Determine canonical employee id
+    canonical_id = next(iter(sorted(possible_ids))) if possible_ids else employee.get("Employee_ID") or employee.get("EmployeeID")
+    canonical_id = str(canonical_id) if canonical_id else employee.get("_id")
+    canonical_id = str(canonical_id)
+
+    # Build forecast dates
+    last_date = history_dates[-1] if history_dates else datetime.utcnow()
+    if not isinstance(last_date, datetime):
+        last_date = datetime.utcnow()
+    forecast_dates = [last_date + timedelta(days=30 * (idx + 1)) for idx in range(periods)]
+
+    historical_payload = [
+        {
+            "date": dt.isoformat(),
+            "score": round(float(score), 2),
+        }
+        for dt, score in history_points[-12:]
+    ]
+
+    predictions_payload = [
+        {
+            "date": forecast_dates[idx].isoformat(),
+            "predicted_score": round(float(score), 2),
+        }
+        for idx, score in enumerate(predictions.tolist())
+    ]
+
+    current_score = round(float(history_scores[-1]), 2)
+    trend_label = _determine_trend(predictions.tolist() if len(predictions) > 0 else history_scores.tolist())
+
+    record = {
+        "employee_id": canonical_id,
+        "employee_ids": list(possible_ids),
+        "generated_at": datetime.utcnow(),
+        "model_version": MODEL_VERSION,
+        "periods": periods,
+        "history_points": len(history_scores),
+        "historical": historical_payload,
+        "predictions": predictions_payload,
+        "current_score": current_score,
+        "trend": trend_label,
+        "metrics": metrics,
+    }
+
+    await db[PREDICTION_COLLECTION].update_one(
+        {"employee_id": canonical_id, "periods": periods},
+        {"$set": record},
+        upsert=True,
+    )
+
+    stored = await db[PREDICTION_COLLECTION].find_one({"employee_id": canonical_id, "periods": periods})
+    return stored or record
+
+
+def _format_prediction_response(record: Dict[str, Any]) -> Dict[str, Any]:
+    generated_at = record.get("generated_at")
+    if isinstance(generated_at, datetime):
+        generated_at_iso = generated_at.isoformat()
+    else:
+        generated_at_iso = _ensure_datetime(generated_at)
+        generated_at_iso = generated_at_iso.isoformat() if generated_at_iso else None
+
+    predictions = record.get("predictions", [])
+    formatted_predictions = []
+    for entry in predictions:
+        date_value = entry.get("date")
+        date_dt = _ensure_datetime(date_value)
+        formatted_predictions.append(
+            {
+                "date": (date_dt.isoformat() if date_dt else date_value),
+                "predicted_score": round(float(entry.get("predicted_score", 0.0)), 2),
+            }
+        )
+
+    historical_entries = record.get("historical", [])
+    formatted_history = []
+    for entry in historical_entries:
+        date_value = entry.get("date")
+        date_dt = _ensure_datetime(date_value)
+        formatted_history.append(
+            {
+                "date": (date_dt.isoformat() if date_dt else date_value),
+                "score": round(float(entry.get("score", 0.0)), 2),
+            }
+        )
+
+    return {
+        "employee_id": str(record.get("employee_id")),
+        "model_version": record.get("model_version"),
+        "generated_at": generated_at_iso,
+        "current_performance_score": round(float(record.get("current_score", 0.0)), 2),
+        "trend": record.get("trend", "stable"),
+        "forecast": formatted_predictions,
+        "historical": formatted_history,
+        "metrics": record.get("metrics", {}),
+        "history_points": record.get("history_points", len(formatted_history)),
+    }
+
 async def predict_attrition_for_employee(employee_id: str):
     """Predict attrition risk for a single employee"""
     if not MODEL_LOADED:
