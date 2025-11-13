@@ -238,7 +238,7 @@ export const OnboardingAgentInterface = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all group ${
                     activeStep === step.id
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
@@ -251,12 +251,12 @@ export const OnboardingAgentInterface = () => {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm text-white hover:text-black transition-colors">{step.name}</h4>
-                        <Badge variant="secondary" className="text-xs">
+                        <h4 className="font-semibold text-sm text-white group-hover:text-black transition-colors">{step.name}</h4>
+                        <Badge variant="secondary" className="text-xs group-hover:text-black">
                           {index + 1}
                         </Badge>
                       </div>
-                      <p className="text-xs text-white hover:text-black transition-colors">{step.description}</p>
+                      <p className="text-xs text-white group-hover:text-black transition-colors">{step.description}</p>
                     </div>
                   </div>
                 </motion.div>

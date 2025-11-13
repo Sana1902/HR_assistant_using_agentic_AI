@@ -238,7 +238,7 @@ export const AgentDashboard = () => {
                         {agent.category}
                       </span>
                     </div>
-                    <CardTitle className="text-xl text-black group-hover:text-purple-300 transition-colors">
+                    <CardTitle className="text-xl text-white group-hover:text-white transition-colors">
                       {agent.name}
                     </CardTitle>
                   </CardHeader>
