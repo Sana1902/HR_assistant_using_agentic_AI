@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, status
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime
 import random
@@ -120,6 +120,87 @@ async def get_employees(
             "pages": (total + limit - 1) // limit
         }
     }
+
+
+@router.get("/employees/roles")
+async def list_employee_roles(department: Optional[str] = Query(None, description="Filter roles by department")):
+    """List unique employee roles (positions) with optional department filter."""
+    db = get_database()
+    collection = db["employee"]
+
+    pipeline: List[Dict[str, Any]] = [
+        {
+            "$project": {
+                "role": {
+                    "$ifNull": [
+                        "$Role",
+                        {
+                            "$ifNull": ["$role", "$Position"]
+                        },
+                    ]
+                },
+                "department": {
+                    "$ifNull": ["$Department", "N/A"]
+                },
+            }
+        },
+        {
+            "$match": {
+                "role": {"$ne": None, "$ne": ""},
+            }
+        },
+    ]
+
+    if department:
+        pipeline.append(
+            {
+                "$match": {
+                    "department": department
+                }
+            }
+        )
+
+    pipeline.extend(
+        [
+            {
+                "$group": {
+                    "_id": {
+                        "role": "$role",
+                        "department": "$department"
+                    },
+                    "role": {"$first": "$role"},
+                    "department": {"$first": "$department"},
+                    "count": {"$sum": 1},
+                }
+            },
+            {
+                "$sort": {
+                    "role": 1,
+                    "department": 1,
+                }
+            },
+        ]
+    )
+
+    cursor = collection.aggregate(pipeline, allowDiskUse=True)
+    results = await cursor.to_list(length=1000)
+
+    role_list = [
+        {
+            "role": entry.get("role", "").strip(),
+            "department": entry.get("department", "N/A") or "N/A",
+            "count": entry.get("count", 0),
+        }
+        for entry in results
+        if entry.get("role")
+    ]
+
+    return {
+        "success": True,
+        "data": role_list,
+        "count": len(role_list),
+    }
+
 
 @router.get("/employees/{employee_id}")
 async def get_employee(employee_id: str):

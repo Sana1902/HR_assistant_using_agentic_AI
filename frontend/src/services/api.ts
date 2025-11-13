@@ -54,6 +54,10 @@ export const employeeService = {
     const response = await api.get('/employees', { params });
     return response.data;
   },
+  listRoles: async (params?: { department?: string }) => {
+    const response = await api.get('/employees/roles', { params });
+    return response.data;
+  },
   getById: async (id: string) => {
     const response = await api.get(`/employees/${id}`);
     return response.data;
@@ -168,10 +172,11 @@ export const jobsService = {
 
 // Agents service
 export const agentsService = {
-  screenResume: async (resumeText: string, jobId?: string, department?: string) => {
+  screenResume: async (resumeText: string, jobId?: string, department?: string, jobRole?: string) => {
     const response = await api.post('/agents/resume-screening', {
       resume_text: resumeText,
       job_id: jobId,
+      job_role: jobRole,
       department,
     });
     return response.data;

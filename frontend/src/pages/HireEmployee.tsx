@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { agentsService, jobsService } from '@/services/api';
+import { agentsService, employeeService, jobsService } from '@/services/api';
 import { motion } from 'framer-motion';
 
 interface ScreeningResult {
@@ -29,6 +29,7 @@ export const HireEmployee = () => {
   const queryClient = useQueryClient();
   const [resumeText, setResumeText] = useState('');
   const [jobId, setJobId] = useState('');
+  const [selectedRoleIndex, setSelectedRoleIndex] = useState('');
   const [jobInfo, setJobInfo] = useState<any | null>(null);
   const [screeningResult, setScreeningResult] = useState<ScreeningResult | null>(null);
   const [isScreening, setIsScreening] = useState(false);
@@ -42,7 +43,21 @@ export const HireEmployee = () => {
     queryFn: () => jobsService.listIds(),
   });
 
+  const {
+    data: rolesData,
+    isLoading: rolesLoading,
+    error: rolesError,
+  } = useQuery({
+    queryKey: ['employee-roles'],
+    queryFn: () => employeeService.listRoles(),
+  });
+
   const jobs = jobsData?.data || [];
+  const roleOptions: Array<{ role: string; department?: string; count?: number }> = rolesData?.data || [];
+  const rolesErrorMessage =
+    rolesError instanceof Error ? rolesError.message : rolesError ? 'Failed to load roles' : null;
+  const selectedRole =
+    selectedRoleIndex !== '' ? roleOptions[Number(selectedRoleIndex)] : undefined;
 
   useEffect(() => {
     const selected = jobs.find((j: any) => j.job_id === jobId);
@@ -64,6 +79,51 @@ export const HireEmployee = () => {
     return () => { cancelled = true; };
   }, [jobId, jobs]);
 
+  useEffect(() => {
+    if (!roleOptions.length || selectedRoleIndex === '') {
+      setJobId('');
+      setJobInfo(null);
+      return;
+    }
+
+    const role = roleOptions[Number(selectedRoleIndex)];
+    if (!role) {
+      setJobId('');
+      setJobInfo(null);
+      return;
+    }
+
+    const matchingJob = jobs.find((job: any) => {
+      const normalized = (value: any) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+      const roleName = normalized(role.role);
+      const candidates = [
+        job.job_id,
+        job.JobID,
+        job.Position,
+        job.position,
+        job.role,
+        job.JobTitle,
+      ];
+      return candidates.some((candidate) => normalized(candidate) === roleName);
+    });
+
+    if (matchingJob?.job_id) {
+      setJobId(matchingJob.job_id);
+      setJobInfo({
+        Position: role.role,
+        Department: role.department,
+        Status: matchingJob.Status || matchingJob.status,
+        RequiredSkills: matchingJob.RequiredSkills || matchingJob.requiredSkills || [],
+      });
+    } else {
+      setJobId('');
+      setJobInfo({
+        Position: role.role,
+        Department: role.department,
+      });
+    }
+  }, [selectedRoleIndex, roleOptions, jobs]);
+
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -78,15 +138,20 @@ export const HireEmployee = () => {
   };
 
   const handleScreenResume = async () => {
-    if (!resumeText || !jobId) {
-      alert('Please upload a resume and select a job');
+    if (!resumeText || (!jobId && !selectedRole)) {
+      alert('Please upload a resume and select a job role');
       return;
     }
 
     setIsScreening(true);
     setScreeningResult(null); // Clear previous results
     try {
-      const result = await agentsService.screenResume(resumeText, jobId);
+      const result = await agentsService.screenResume(
+        resumeText,
+        jobId || undefined,
+        selectedRole?.department,
+        selectedRole?.role
+      );
       
       // Check for error in response
       if (result.data && result.data.error) {
@@ -203,21 +268,59 @@ export const HireEmployee = () => {
               <CardContent className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Select Job
+                    Select Job Role
                   </label>
-                  {jobsLoading ? (
+                  {rolesLoading ? (
+                    <div className="text-sm text-slate-400 mb-4">Loading job roles...</div>
+                  ) : rolesErrorMessage ? (
+                    <div className="text-sm text-red-400 mb-4">{rolesErrorMessage}</div>
+                  ) : roleOptions && roleOptions.length > 0 ? (
+                    <>
+                      <select
+                        value={selectedRoleIndex}
+                        onChange={(e) => setSelectedRoleIndex(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-600 bg-slate-700/50 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 mb-2"
+                      >
+                        <option value="">-- Select a Job Role --</option>
+                        {roleOptions.map((role, idx) => (
+                          <option key={`${role.role}-${role.department}-${idx}`} value={idx}>
+                            {role.role}
+                            {role.department && role.department !== 'N/A' ? ` (${role.department})` : ''}
+                            {typeof role.count === 'number' && role.count > 1 ? ` • ${role.count}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedRole && (
+                        <div className="text-xs text-slate-400 mb-3 bg-slate-700/30 p-3 rounded-lg">
+                          <div><span className="font-medium text-purple-300">Role:</span> <span className="text-white">{selectedRole.role}</span></div>
+                          <div><span className="font-medium text-purple-300">Department:</span> <span className="text-white">{selectedRole.department || 'N/A'}</span></div>
+                          {typeof selectedRole.count === 'number' && (
+                            <div><span className="font-medium text-purple-300">Employees in role:</span> <span className="text-white">{selectedRole.count}</span></div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : jobsLoading ? (
                     <div className="text-sm text-slate-400 mb-4">Loading jobs...</div>
                   ) : jobs && jobs.length > 0 ? (
                     <>
                       <select
                         value={jobId}
-                        onChange={(e) => setJobId(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setJobId(value);
+                          if (value) {
+                            const idx = roleOptions.findIndex((role) => role.role === value);
+                            if (idx >= 0) setSelectedRoleIndex(String(idx));
+                          }
+                        }}
                         className="w-full px-3 py-2 border border-slate-600 bg-slate-700/50 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 mb-2"
                       >
-                        <option value="">-- Select a Job --</option>
+                        <option value="">-- Select a Job Role --</option>
                         {jobs.map((job: any) => (
                           <option key={job.job_id} value={job.job_id}>
-                            {job.job_id} — {job.position} ({job.department})
+                            {job.position || job.JobTitle || job.role || 'Unknown Role'}
+                            {job.department ? ` (${job.department})` : ''}
                           </option>
                         ))}
                       </select>
@@ -297,7 +400,7 @@ export const HireEmployee = () => {
                     e.preventDefault();
                     handleScreenResume();
                   }}
-                  disabled={!resumeText || !jobId || isScreening}
+                  disabled={!resumeText || (!jobId && !selectedRole) || isScreening}
                   className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white shadow-lg shadow-purple-500/50"
                 >
                   {isScreening ? (

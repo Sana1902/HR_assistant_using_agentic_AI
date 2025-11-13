@@ -16,6 +16,7 @@ from pathlib import Path
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from collections import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -218,28 +219,131 @@ class ResumeScreeningAgent:
             "reason": "Similarity-based scoring without external AI",
         }
     
-    async def screen_resume(self, resume_text: str, job_id: str) -> Dict[str, Any]:
+    async def _derive_requirements_from_employees(self, role: str, department: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Infer job requirements from existing employees when explicit job definition is unavailable."""
+        if not role:
+            return None
+
+        db = get_database()
+        query: Dict[str, Any] = {
+            "$or": [
+                {"Role": role},
+                {"role": role},
+                {"Position": role},
+            ]
+        }
+        if department:
+            query["Department"] = department
+
+        projection = {
+            "Skills": 1,
+            "skills": 1,
+            "ExperienceYears": 1,
+            "Experience": 1,
+            "experience_years": 1,
+            "Department": 1,
+            "Education": 1,
+            "education": 1,
+        }
+
+        cursor = db["employee"].find(query, projection).limit(100)
+        employees = await cursor.to_list(length=100)
+        if not employees:
+            return None
+
+        skill_counter: Counter[str] = Counter()
+        exp_values = []
+        education_counter: Counter[str] = Counter()
+        department_value = department
+
+        for emp in employees:
+            dept = emp.get("Department") or department_value
+            if dept:
+                department_value = dept
+
+            skills_value = emp.get("Skills") or emp.get("skills") or ""
+            if isinstance(skills_value, list):
+                parsed_skills = [str(s).strip() for s in skills_value if str(s).strip()]
+            elif isinstance(skills_value, str):
+                parsed_skills = [
+                    s.strip()
+                    for s in re.split(r"[,;/|]", skills_value)
+                    if s.strip()
+                ]
+            else:
+                parsed_skills = []
+
+            skill_counter.update([skill for skill in parsed_skills if skill])
+
+            exp = (
+                emp.get("ExperienceYears")
+                or emp.get("experience_years")
+                or emp.get("Experience")
+            )
+            try:
+                if isinstance(exp, (int, float)):
+                    exp_values.append(float(exp))
+                elif isinstance(exp, str) and exp.strip():
+                    exp_values.append(float(exp.strip()))
+            except (ValueError, TypeError):
+                continue
+
+            education_value = emp.get("Education") or emp.get("education")
+            if education_value and isinstance(education_value, str):
+                education_counter.update([education_value.strip()])
+
+        top_skills = [skill for skill, _ in skill_counter.most_common(10)]
+        avg_experience = int(round(sum(exp_values) / len(exp_values))) if exp_values else 0
+        education = education_counter.most_common(1)
+        primary_education = education[0][0] if education else ""
+
+        return {
+            "required_skills": top_skills,
+            "experience_years": avg_experience,
+            "education": primary_education,
+            "position": role,
+            "department": department_value or department or "",
+        }
+
+    async def screen_resume(self, resume_text: str, job_identifier: str, job_role: Optional[str] = None, department: Optional[str] = None) -> Dict[str, Any]:
         """Complete resume screening workflow"""
         db = get_database()
         
         # Get job requirements (support both JobID and _id strings)
-        job = await db["Jobs"].find_one({"JobID": job_id})
+        job = await db["Jobs"].find_one({"JobID": job_identifier})
         if not job:
             # Try treating job_id as Mongo ObjectId
             try:
-                job = await db["Jobs"].find_one({"_id": ObjectId(job_id)})
+                job = await db["Jobs"].find_one({"_id": ObjectId(job_identifier)})
             except Exception:
                 job = None
+        if not job and job_role:
+            job = await db["Jobs"].find_one({"Position": job_role})
         if not job:
-            return {"error": "Job not found"}
+            job = await db["Jobs"].find_one({"Position": job_identifier})
+        derived_requirements: Optional[Dict[str, Any]] = None
+        if not job:
+            derived_requirements = await self._derive_requirements_from_employees(job_role or job_identifier, department)
+            if not derived_requirements:
+                return {"error": "Job not found"}
         
-        job_requirements = {
-            "required_skills": job.get("RequiredSkills", []),
-            "experience_years": job.get("ExperienceRequired", 0),
-            "education": job.get("EducationRequired", ""),
-            "position": job.get("Position", ""),
-            "department": job.get("Department", "")
-        }
+        job_requirements = (
+            {
+                "required_skills": job.get("RequiredSkills", []),
+                "experience_years": job.get("ExperienceRequired", 0),
+                "education": job.get("EducationRequired", ""),
+                "position": job.get("Position", ""),
+                "department": job.get("Department", "")
+            }
+            if job
+            else derived_requirements
+        )
+        has_job_document = job is not None
+        job_identifier_value = (
+            job.get("JobID")
+            if job and job.get("JobID")
+            else job_identifier
+        )
         
         # Parse resume
         candidate_data = await self.parse_resume(resume_text)
@@ -261,7 +365,7 @@ class ResumeScreeningAgent:
         
         # Save screening result
         screening_result = {
-            "job_id": job_id,
+            "job_id": job_identifier_value,
             "candidate_name": candidate_data.get("name", "Unknown"),
             "candidate_email": candidate_data.get("email", ""),
             "candidate_data": candidate_data,
@@ -274,12 +378,12 @@ class ResumeScreeningAgent:
         screening_result["_id"] = str(result.inserted_id)
         
         # Auto-action based on score
-        if score.get("overall_score", 0) >= 80:
+        if has_job_document and score.get("overall_score", 0) >= 80:
             # High score - auto-advance to interview
-            await self._auto_advance_candidate(candidate_data, job_id, screening_result)
-        elif score.get("overall_score", 0) >= 60:
+            await self._auto_advance_candidate(candidate_data, job_identifier_value, screening_result)
+        elif has_job_document and score.get("overall_score", 0) >= 60:
             # Medium score - notify HR for review
-            await self._notify_hr_review(candidate_data, job_id, score)
+            await self._notify_hr_review(candidate_data, job_identifier_value, score)
         
         return screening_result
     

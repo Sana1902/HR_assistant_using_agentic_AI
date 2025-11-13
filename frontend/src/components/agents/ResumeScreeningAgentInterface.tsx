@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Search, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { agentsService } from '@/services/api';
+import { agentsService, employeeService } from '@/services/api';
 
 const WORKFLOW_STEPS = [
   {
@@ -36,14 +35,52 @@ const WORKFLOW_STEPS = [
 
 export const ResumeScreeningAgentInterface = () => {
   const [resumeText, setResumeText] = useState('');
-  const [jobId, setJobId] = useState('');
+  const [roleOptions, setRoleOptions] = useState<Array<{ role: string; department?: string; count?: number }>>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesError, setRolesError] = useState<string | null>(null);
+  const [selectedRoleIndex, setSelectedRoleIndex] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchRoles() {
+      setRolesLoading(true);
+      setRolesError(null);
+      try {
+        const response = await employeeService.listRoles();
+        if (isMounted) {
+          setRoleOptions(response?.data ?? []);
+        }
+      } catch (error: any) {
+        if (isMounted) {
+          setRolesError(error?.message || 'Failed to load roles');
+        }
+      } finally {
+        if (isMounted) {
+          setRolesLoading(false);
+        }
+      }
+    }
+
+    fetchRoles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleScreenResume = async () => {
     setLoading(true);
     try {
-      const response = await agentsService.screenResume(resumeText, jobId);
+      const selectedRole = selectedRoleIndex ? roleOptions[Number(selectedRoleIndex)] : undefined;
+      const response = await agentsService.screenResume(
+        resumeText,
+        undefined,
+        selectedRole?.department,
+        selectedRole?.role
+      );
       setResult(response);
     } catch (error: any) {
       setResult({ success: false, error: error.message || 'Failed to screen resume' });
@@ -63,9 +100,9 @@ export const ResumeScreeningAgentInterface = () => {
             <FileText className="w-6 h-6 text-white" />
           </div>
           <div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent transition-colors duration-300 group-hover:text-white">
-        Resume Screening Agent
-          </h2>
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              Resume Screening Agent
+            </h2>
             <p className="text-slate-600 mt-1">Automatically screen resumes and match to job requirements</p>
           </div>
         </div>
@@ -91,10 +128,10 @@ export const ResumeScreeningAgentInterface = () => {
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <h4 className="font-semibold text-white group-hover:text-black transition-colors">{step.name}</h4>
-                    <Badge variant="secondary" className="group-hover:text-black">Step {index + 1}</Badge>
+                    <Badge variant="secondary">Step {index + 1}</Badge>
                   </div>
                   <p className="text-sm text-white group-hover:text-black transition-colors mb-2">{step.description}</p>
-                  <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-black group-hover:text-black">
+                  <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-black">
                     {step.api}
                   </div>
                 </motion.div>
@@ -123,13 +160,30 @@ export const ResumeScreeningAgentInterface = () => {
 
               <div>
                 <label className="text-sm font-medium text-slate-700 mb-1 block">
-                  Job ID (optional)
+                  Select Job Role (optional)
                 </label>
-                <Input
-                  value={jobId}
-                  onChange={(e) => setJobId(e.target.value)}
-                  placeholder="JOB123 or leave empty"
-                />
+                {rolesLoading ? (
+                  <div className="text-sm text-slate-500">Loading roles...</div>
+                ) : rolesError ? (
+                  <div className="text-sm text-red-500">{rolesError}</div>
+                ) : roleOptions.length > 0 ? (
+                  <select
+                    value={selectedRoleIndex}
+                    onChange={(e) => setSelectedRoleIndex(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black bg-white"
+                  >
+                    <option value="">-- Select a Job Role --</option>
+                    {roleOptions.map((option, idx) => (
+                      <option key={`${option.role}-${option.department}-${idx}`} value={String(idx)}>
+                        {option.role}
+                        {option.department && option.department !== 'N/A' ? ` (${option.department})` : ''}
+                        {typeof option.count === 'number' && option.count > 1 ? ` • ${option.count}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-sm text-amber-600">No roles available. Please add employees first.</div>
+                )}
               </div>
 
               <Button

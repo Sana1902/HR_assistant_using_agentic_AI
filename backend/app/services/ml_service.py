@@ -3,11 +3,13 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from app.core.config import settings
 from app.core.database import get_database
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Iterable, Tuple, Set
 
 logger = logging.getLogger(__name__)
 

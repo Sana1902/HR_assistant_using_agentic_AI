@@ -26,6 +26,7 @@ router = APIRouter()
 class ResumeScreeningRequest(BaseModel):
     resume_text: str
     job_id: Optional[str] = None
+    job_role: Optional[str] = None
     department: Optional[str] = None
 
 class ScheduleMeetingRequest(BaseModel):
@@ -38,15 +39,15 @@ async def screen_resume(request: ResumeScreeningRequest):
     """Screen a resume against job requirements"""
     try:
         agent = ResumeScreeningAgent()
-        job_id = request.job_id
-        if not job_id:
+        job_identifier = request.job_id or request.job_role
+        department = (request.department or '').strip()
+        if not job_identifier:
             db = get_database()
-            dept = (request.department or '').strip()
-            if dept and dept.upper() != 'N/A':
+            if department and department.upper() != 'N/A':
                 # Resolve by department
-                doc = await db["Jobs"].find_one({"Department": dept, "Status": "Open"})
+                doc = await db["Jobs"].find_one({"Department": department, "Status": "Open"})
                 if not doc:
-                    doc = await db["Jobs"].find_one({"Department": dept})
+                    doc = await db["Jobs"].find_one({"Department": department})
             else:
                 # Fallback: pick any open job
                 doc = await db["Jobs"].find_one({"Status": "Open"})
@@ -54,11 +55,17 @@ async def screen_resume(request: ResumeScreeningRequest):
                     doc = await db["Jobs"].find_one({})
             if not doc:
                 return {"success": False, "message": f"No jobs available for screening", "data": None}
-            job_id = doc.get("JobID") or str(doc.get("_id"))
-        if not job_id:
+            job_identifier = doc.get("JobID") or doc.get("Position") or str(doc.get("_id"))
+            department = doc.get("Department", department)
+        if not job_identifier:
             return {"success": False, "message": "No job selected. Provide job_id or department.", "data": None}
 
-        result = await agent.screen_resume(request.resume_text, job_id)
+        result = await agent.screen_resume(
+            request.resume_text,
+            job_identifier,
+            job_role=request.job_role,
+            department=department or None
+        )
         
         # Check if result contains an error
         if isinstance(result, dict) and result.get("error"):

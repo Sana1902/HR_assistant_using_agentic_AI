@@ -1,8 +1,7 @@
-from pydantic_settings import BaseSettings
-from typing import Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    # API Keys
+    # API Key
     GEMINI_API_KEY: str = "AIzaSyBhobHkOe3ede9TAgNB3ZGJNzg__SdROhI"
     
     # Email Config
@@ -27,9 +26,11 @@ class Settings(BaseSettings):
     # Model Paths
     MODEL_DIR: str = "models"
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 settings = Settings()
 
