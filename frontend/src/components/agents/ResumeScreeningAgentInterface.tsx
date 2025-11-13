@@ -87,14 +87,14 @@ export const ResumeScreeningAgentInterface = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="border border-slate-200 rounded-lg p-4"
+                  className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors group"
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-semibold">{step.name}</h4>
+                    <h4 className="font-semibold text-white group-hover:text-black transition-colors">{step.name}</h4>
                     <Badge variant="secondary">Step {index + 1}</Badge>
                   </div>
-                  <p className="text-sm text-slate-600 mb-2">{step.description}</p>
-                  <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-slate-700">
+                  <p className="text-sm text-white group-hover:text-black transition-colors mb-2">{step.description}</p>
+                  <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-black">
                     {step.api}
                   </div>
                 </motion.div>
@@ -117,7 +117,7 @@ export const ResumeScreeningAgentInterface = () => {
                   value={resumeText}
                   onChange={(e) => setResumeText(e.target.value)}
                   placeholder="Paste resume text here..."
-                  className="w-full min-h-[200px] p-3 border border-slate-300 rounded-lg resize-none"
+                  className="w-full min-h-[200px] p-3 border border-slate-300 rounded-lg resize-none text-black"
                 />
               </div>
 

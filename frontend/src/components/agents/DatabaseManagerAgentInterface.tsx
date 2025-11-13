@@ -166,7 +166,7 @@ export const DatabaseManagerAgentInterface = () => {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors"
+                    className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors group"
                   >
                     <div className="flex items-start gap-3">
                       <div className="bg-teal-100 p-2 rounded-lg">
@@ -174,13 +174,13 @@ export const DatabaseManagerAgentInterface = () => {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold">{step.name}</h4>
+                          <h4 className="font-semibold text-white group-hover:text-black transition-colors">{step.name}</h4>
                           <Badge variant="secondary" className="text-xs">
                             Step {index + 1}
                           </Badge>
                         </div>
-                        <p className="text-sm text-slate-600 mb-2">{step.description}</p>
-                        <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-slate-700">
+                        <p className="text-sm text-white group-hover:text-black transition-colors mb-2">{step.description}</p>
+                        <div className="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-black">
                           {step.api}
                         </div>
                       </div>
@@ -210,7 +210,7 @@ export const DatabaseManagerAgentInterface = () => {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="e.g., Show all employees in Engineering department"
-                  className="w-full min-h-[120px] p-3 border border-slate-300 rounded-lg resize-none"
+                  className="w-full min-h-[120px] p-3 border border-slate-300 rounded-lg resize-none text-black"
                 />
               </div>
 

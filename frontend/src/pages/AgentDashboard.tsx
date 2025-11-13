@@ -232,13 +232,13 @@ export const AgentDashboard = () => {
                   <CardHeader className="relative z-10">
                     <div className="flex items-start justify-between mb-4">
                       <div className={`bg-gradient-to-br ${agent.color} p-4 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-                        <Icon className="w-6 h-6 text-white" />
+                        <Icon className="w-6 h-6 text-black" />
                       </div>
                       <span className="text-xs font-semibold text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
                         {agent.category}
                       </span>
                     </div>
-                    <CardTitle className="text-xl text-white group-hover:text-purple-300 transition-colors">
+                    <CardTitle className="text-xl text-black group-hover:text-purple-300 transition-colors">
                       {agent.name}
                     </CardTitle>
                   </CardHeader>
